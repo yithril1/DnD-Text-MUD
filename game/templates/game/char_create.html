@@ -1,0 +1,964 @@
+{% load staticfiles %}
+{% load static %}
+
+<html>
+<style CSS>
+.highlighted {
+  color: #1919b9;
+  font-weight: 900;
+}
+.highlighted2 {
+    font-weight: 900;
+    color: #FF0000;
+}
+.unhighlighted {
+    color: #C0C0C0;
+    font-weight: 700;
+}
+body {
+background-repeat: no-repeat;
+background-size: 100% 100%;
+}
+
+
+</style>
+
+    <head>
+        <title>Character Creation</title>
+        <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+        <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+        <script>
+        $(document).ready(function() {
+            var $tries = 2;
+            var $dicearray = [];
+            var $bonusarray = [0,0,0,0,0,0];
+            var $skillpoints = 0;
+            var $skilltally = 0;
+
+            document.getElementById("triesLeft").innerHTML = $tries;
+            document.getElementById("skillPoints").innerHTML = $skillpoints;
+
+                    // Submit post on submit
+             $('#post-form').on('submit', function(event){
+                    var error = false;
+                    event.preventDefault();
+                    //Check that guild is picked
+                    if($('#id_guild').val() == ''){
+                        alert('You must pick a class!');
+                        error = true;
+                    }
+                    //Check that race is picked.
+                    if($('#id_race').val() == '') {
+                        alert('You must pick a race!');
+                        error = true;
+                    }
+                    //Check for a background
+                    if($('#id_background').val() == '') {
+                        alert('You must pick a background!');
+                        error = true;
+                    }
+                    //Check if subrace is needed
+                    if($('#id_subrace option').length > 1 && $('#id_subrace').val() == 'Please select sub race') {
+                        alert('You must pick a subrace!');
+                        error = true;
+                    }
+                    //Guild selected but didn't select skills
+                    if($('#id_guild').val() != '' && $skilltally > 0 ) {
+                        alert('Please use all skill points');
+                        error = true;
+                    }
+                    if($bonusarray == [0,0,0,0,0,0]) {
+                        alert('Please roll for stats');
+                        error=true;
+                    }
+                    if($('#id_name').val() == '') {
+                        alert('Please pick a name!');
+                        error=true;
+                    }
+                    if(error == false){
+                    create_post();
+                    }
+                });
+
+            function create_post() {
+                $.ajax({
+                url : "post_character", // the endpoint
+                type : "POST", // http method
+                data : {
+                    name : $('#id_name').val(),
+                    csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),
+                    strength : $('#txtSTAT1').val(),
+                    dexterity : $('#txtSTAT2').val(),
+                    constitution : $('#txtSTAT3').val(),
+                    intelligence : $('#txtSTAT4').val(),
+                    wisdom : $('#txtSTAT5').val(),
+                    charisma : $('#txtSTAT6').val(),
+                    race : $('#id_race').val(),
+                    subrace : $('#id_subrace').val(),
+                    guild : $('#id_guild').val(),
+                    lawfulAlignment : $('#id_lawfulAlignment').val(),
+                    goodAlignment : $('#id_goodAlignment').val(),
+                    background : $('#id_background').val(),
+                    acrobatics : $('#chkAcrobatics').prop("checked"),
+                    animal_handling : $('#chkAnimalHandling').prop("checked"),
+                    arcana : $('#chkArcana').prop("checked"),
+                    athletics : $('#chkAthletics').prop("checked"),
+                    deception : $('#chkDeception').prop("checked"),
+                    history : $('#chkHistory').prop("checked"),
+                    insight : $('#chkInsight').prop("checked"),
+                    intimidation : $('#chkIntimidation').prop("checked"),
+                    investigation : $('#chkInvestigation').prop("checked"),
+                    medicine : $('#chkMedicine').prop("checked"),
+                    nature : $('#chkNature').prop("checked"),
+                    perception : $('#chkPerception').prop("checked"),
+                    performance : $('#chkPerformance').prop("checked"),
+                    persuasion : $('#chkPersuasion').prop("checked"),
+                    religion : $('#chkReligion').prop("checked"),
+                    sleight_of_hand : $('#chkSleightofHand').prop("checked"),
+                    stealth : $('#chkStealth').prop("checked"),
+                    survival : $('#chkSurvival').prop("checked")
+                 }, // data sent with the post request
+
+                // handle a successful response
+                success : function(json) {
+                console.log('success!');
+                },
+
+                // handle a non-successful response
+                error : function(xhr,errmsg,err) {
+                console.log('error!');
+                    $('#results').html("<div class='alert-box alert radius' data-alert>Oops! We have encountered an error: "+errmsg+
+                        " <a href='#' class='close'>&times;</a></div>"); // add the error to the dom
+                    console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+                }
+                }).done(function (data) {
+                        if (data.success) {
+                            window.location.href = data.url;
+                        }
+                                        });
+                }
+            $('[id^=chk]').on('change', function(e) {
+                //This differentiates between skills from background vs. not
+                var ischecked = $(this).is(':checked');
+                var isskill = $('input[name="skill"]:checked').length;
+                if ($('input[name="skill"]:checked').length > $skillpoints) {
+                    $(this).prop('checked', false);
+                }
+                    $skilltally = $skillpoints - $('input[name="skill"]:checked').length
+                    document.getElementById("skillPoints").innerHTML = $skilltally;
+
+            });
+
+
+            function setSkills() {
+            //Clear out all disabled
+            $('[id^=chk]').each(function() {
+                $(this).attr("disabled", false);
+                $(this).prop("checked", false);
+            });
+            //Clear CSS
+            $('[id^=lbl]').each(function() {
+                $(this).removeClass("unhighlighted");
+            });
+
+            $.ajax({
+                url: 'get_skill_proficiencies',
+                type: 'POST',
+                dataType: "json",
+                data : { id_guild:  $('#id_guild').val(),
+                         id_background : $('#id_background').val(),
+                         csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                success: function(data){
+                        for(var key in data){
+                           $('#chk'+key).attr("disabled", !data[key]);
+                           if(!data[key]) {
+                               $('#lbl'+key).addClass("unhighlighted");
+                           }
+                        }
+
+                    },
+                error: function() {
+                    console.log('ERROR!');
+                }
+                        });
+
+                $.ajax({
+                    url: 'get_background_info',
+                    type: 'POST',
+                    dataType: "json",
+                    data : { id_background : $('#id_background').val(),
+                             csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                    success: function(data){
+                        console.log(data);
+                        //Find the profession related skills
+
+                            $('[id^=chk]').each(function() {
+                            var skillname = $(this).prop("id").replace("chk", "");
+                            if(skillname in data) {
+                                if(data[skillname]) {
+                                    $('#chk'+skillname).attr("disabled", true);
+                                    $('#chk'+skillname).prop("checked", true);
+                                    $('#chk'+skillname).attr("name", "backgroundskill");
+                                                    }
+                                                  }
+                                                       });
+                                             }
+                        });
+
+                $skilltally = $skillpoints - $('input[name="skill"]:checked').length
+                    document.getElementById("skillPoints").innerHTML = $skilltally;
+            }
+
+            $('#id_background').change(function() {
+                $('[id^=chk]').each(function() {
+                        $(this).prop("name", "skill");
+                    });
+                $.ajax({
+                    url: 'get_background_info',
+                    type: 'POST',
+                    dataType: "json",
+                    data : { id_background : $('#id_background').val(),
+                             csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                    success: function(data){
+                        $('#txtBackground').val(data.desc);
+                        setSkills();
+                    }
+                });
+            });
+
+            function calcState() {
+                var Str = $dicearray[0] + $bonusarray[0];
+                var Con = $dicearray[1] + $bonusarray[1];
+                var Dex = $dicearray[2] + $bonusarray[2];
+                var Int = $dicearray[3] + $bonusarray[3];
+                var Wis = $dicearray[4] + $bonusarray[4];
+                var Cha = $dicearray[5] + $bonusarray[5];
+                $('#txtSTAT1').html(Str);
+                $('#txtSTAT2').html(Con);
+                $('#txtSTAT3').html(Dex);
+                $('#txtSTAT4').html(Int);
+                $('#txtSTAT5').html(Wis);
+                $('#txtSTAT6').html(Cha);
+
+                //Let's highlight!
+                if($bonusarray[0] > 0) {$('#txtSTAT1').addClass("highlighted2");} else {$('#txtSTAT1').removeClass("highlighted2");}
+                if($bonusarray[1] > 0) {$('#txtSTAT2').addClass("highlighted2");} else {$('#txtSTAT2').removeClass("highlighted2");}
+                if($bonusarray[2] > 0) {$('#txtSTAT3').addClass("highlighted2");} else {$('#txtSTAT3').removeClass("highlighted2");}
+                if($bonusarray[3] > 0) {$('#txtSTAT4').addClass("highlighted2");} else {$('#txtSTAT4').removeClass("highlighted2");}
+                if($bonusarray[4] > 0) {$('#txtSTAT5').addClass("highlighted2");} else {$('#txtSTAT5').removeClass("highlighted2");}
+                if($bonusarray[5] > 0) {$('#txtSTAT6').addClass("highlighted2");} else {$('#txtSTAT6').removeClass("highlighted2");}
+            }
+
+            $('[id^=btnRight]').click(function() {
+                var position = $(this).attr('id');
+                position = parseInt(position.replace('btnRight-', ''));
+                next = position+1;
+                secondarray = $dicearray;
+                if ($dicearray.length > 0) {
+
+                if (position == 5) {
+                    var firstn = $dicearray[5];
+                    var secondn = $dicearray[0];
+                    secondarray[0] = firstn;
+                    secondarray[5] = secondn;
+                    $dicearray = secondarray;
+                }
+                else {
+                   var first = $dicearray[position];
+                   var second = $dicearray[next];
+                   secondarray[position] = second;
+                   secondarray[next] = first;
+                   $dicearray = secondarray;
+                }
+                calcState();
+            }
+            });
+
+            $('[id^=btnLeft]').click(function() {
+                var position = $(this).attr('id');
+                position = parseInt(position.replace('btnLeft-', ''));
+                prev = position-1
+                secondarray = $dicearray;
+                if ($dicearray.length > 0) {
+                if (position == 0) {
+                    var firstn = $dicearray[5];
+                    var secondn = $dicearray[0];
+                    secondarray[0] = firstn;
+                    secondarray[5] = secondn;
+                    $dicearray = secondarray;
+                }
+                else {
+                   var first = $dicearray[position];
+                   var second = $dicearray[prev];
+                   secondarray[position] = second;
+                   secondarray[prev] = first;
+                   $dicearray = secondarray;
+                }
+                calcState();
+            }
+            });
+
+            $('#id_subrace').change(function() {
+                $.ajax({
+                    url: "get_subrace_stats",
+                    type: "POST",
+                    data : { id_subrace : $('#id_subrace').val(),
+                              csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                    dataType: "json",
+                    success: function(data) {
+                        $('#txtSubRaceInfo').val(data.desc);
+                        $('#raceimage').attr("src", data.r_img);
+                        $('#strBonus').html("+" + data.str);
+                        $('#dexBonus').html("+" +data.dex);
+                        $('#conBonus').html("+" +data.con);
+                        $('#intBonus').html("+" +data.int);
+                        $('#wisBonus').html("+" +data.wis);
+                        $('#chaBonus').html("+" +data.cha);
+                        $bonusarray = [];
+                                    $bonusarray.push(data.str);
+                                    $bonusarray.push(data.dex);
+                                    $bonusarray.push(data.con);
+                                    $bonusarray.push(data.int);
+                                    $bonusarray.push(data.wis);
+                                    $bonusarray.push(data.cha);
+                        calcState();
+                    }
+                });
+            });
+
+            $('#btnRoll').click(function() {
+                if ($tries > 0) {
+                var diceroll = 0;
+                $dicearray = [];
+                for (i=1; i < 7; i++) {
+                    diceroll = Math.floor(Math.random() * 13 + 6);
+                    $('#txtNumber'+i).val(diceroll);
+                    $('#txtSTAT'+i).html(diceroll);
+                    $dicearray.push(diceroll);
+                }
+                $tries -= 1;
+                document.getElementById("triesLeft").innerHTML = $tries;
+                calcState();
+                }
+
+            });
+
+            $('#id_guild').change(function() {
+
+                $.ajax({
+                    url : "get_guild_info",
+                    type : "POST",
+                    data : { id_guild : $('#id_guild').val(),
+                             csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                    dataType: "json",
+                    success: function(data) {
+                        $('#txtGuildInfo').val(data.desc);
+                        $('#classimage').attr("src", data.g_img);
+                        document.getElementById("skillPoints").innerHTML = data.skill_points;
+                        $skillpoints = data.skill_points;
+                        $skilltally = $skillpoints;
+                        setSkills();
+                                             }
+                });
+
+             });
+
+             $('#id_race').change(function() {
+                $('#txtSubRaceInfo').val('');
+                $.ajax({
+                    url : "get_race_info",
+                    type : "POST",
+                    data : { id_race : $('#id_race').val(),
+                             csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                    dataType: "json",
+                    success: function(data) {
+                        $('#txtRaceInfo').val(data.desc);
+                        $('#raceimage').attr("src", data.r_img);
+                        $('#strBonus').html("+" + data.str);
+                        $('#dexBonus').html("+" +data.dex);
+                        $('#conBonus').html("+" +data.con);
+                        $('#intBonus').html("+" +data.int);
+                        $('#wisBonus').html("+" +data.wis);
+                        $('#chaBonus').html("+" +data.cha);
+                        $bonusarray = [];
+                                    $bonusarray.push(data.str);
+                                    $bonusarray.push(data.dex);
+                                    $bonusarray.push(data.con);
+                                    $bonusarray.push(data.int);
+                                    $bonusarray.push(data.wis);
+                                    $bonusarray.push(data.cha);
+                                    calcState();
+                        }
+                });
+
+                $.ajax({
+                    url: "get_subraces",
+                    type: "POST",
+                    data : { id_race : $('#id_race').val(),
+                                 csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                        dataType: "json",
+                        success: function(data) {
+                            	  $('#id_subrace').empty();
+                            	  $.each(data, function(i, name) {
+
+                                $('#id_subrace').append($('<option>').text(name).attr('name', name));
+                                });
+
+                                if ($('#id_subrace').has('option').length > 0) {
+                                    $("<option>Please select sub race</option>").insertBefore("#id_subrace option:first");
+                                    $("#id_subrace").val($("#id_subrace option:first").val());
+                                    $.ajax({
+                                    url: "get_subrace_stats",
+                                    type: "POST",
+                                    data : {id_subrace : $('#id_subrace').val(),
+                                     csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val(),},
+                                    dataType: "json",
+                                    success: function(data) {
+                                    $('#strBonus').html("+" + data.str);
+                                    $('#dexBonus').html("+" +data.dex);
+                                    $('#conBonus').html("+" +data.con);
+                                    $('#intBonus').html("+" +data.int);
+                                    $('#wisBonus').html("+" +data.wis);
+                                    $('#chaBonus').html("+" +data.cha);
+
+                                    $bonusarray = [];
+                                    $bonusarray.push(data.str);
+                                    $bonusarray.push(data.dex);
+                                    $bonusarray.push(data.con);
+                                    $bonusarray.push(data.int);
+                                    $bonusarray.push(data.wis);
+                                    $bonusarray.push(data.cha);
+                                    calcState();
+                                    }
+                                    });
+                                }
+                                }
+                            });
+
+                });
+                });
+
+    </script>
+    </head>
+
+<body>
+
+<div class="container">
+
+                     <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Step 1: Pick a name for your character!</h4>
+        </div>
+        <div class="panel-body">
+            <div class="row">
+                <div class = "col-lg-6">
+                    <table class="table" border="0" width="80%">
+                        <tr>
+                            <td>What's your character name?:</td>
+                            <td>{{ CreateCharForm.name }}</td>
+                        </tr>
+                    </table>
+
+                </div>
+                <div class="col-lg-6">
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Step 2: Roll for stats!</h4>
+        </div>
+        <div class="panel-body">
+            <div class="row">
+
+                <div class="col-md-10">
+                    <div class="row" style="padding-top: 40px; padding-left: 10px;">
+                        <div class="col-md-12">
+                            <table class="table" border="0">
+                                <tr>
+                                    <p style="text-align: center; font-size: 16px;">Click the die to roll for stats!  If you like your roll, move on!</p>
+                                </tr>
+                            <tr>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;" id="txtNumber1" readonly></textarea>
+                                </td>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;" id="txtNumber2" readonly></textarea>
+                                </td>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;;" id="txtNumber3" readonly></textarea>
+                                </td>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;" id="txtNumber4" readonly></textarea>
+                                </td>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;" id="txtNumber5" readonly></textarea>
+                                </td>
+                                <td width="16.66%" align="center">
+                                    <textarea style="width: 65px; font-size: 22px;" id="txtNumber6" readonly></textarea>
+                                </td>
+                            </tr>
+                                <tr>
+                                    <td align="center">
+                                        Tries Left:
+                                    </td>
+                                    <td>
+                                       <div id="triesLeft"></div>
+                                    </td>
+                                    <td>
+
+                                    </td>
+                                </tr>
+                        </table>
+                        </div>
+
+                    </div>
+
+                </div>
+                <div class="col-md-2">
+                    <div class="row">
+                        <div class="col-md-12">
+                          {% load staticfiles %}
+                    <img src="{% static "game/20sideddice.jpg" %}" class="img-responsive" id = "dice" alt="My image"/>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 text-center">
+                            <button class="btn btn-primary " type="button" id="btnRoll">Roll!</button>
+                    </div>
+                </div>
+
+
+                </div>
+
+                </div>
+
+        </div>
+    </div>
+        </div>
+
+
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Step 3: Pick a race/subrace and a class!</h4>
+        </div>
+        <div class="panel-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="row">
+                        <div class="col-md-6">
+
+                            <div class="form-group">
+                        {{ CreateCharForm.race }} {% csrf_token %}
+                    </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                        {{ CreateCharForm.subrace }}
+                    </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <textarea class="form-control"  rows = 7 id="txtRaceInfo" readonly></textarea>
+                        </div>
+                    </div>
+                    <div class="row" style="padding-top: 5px;">
+                        <div class="col-md-12">
+                            <textarea class="form-control" rows="5" id="txtSubRaceInfo" readonly></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="col-md-4">
+                    {% load staticfiles %}
+                    <img src="{% static "game/raceplaceholder.jpg" %}" id="raceimage" class="center-block img-responsive" alt="My image"/>
+                </div>
+            </div>
+
+    </div>
+    </div>
+
+        <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Step 4: Assign your stats!</h4>
+        </div>
+        <div class="panel-body">
+            <div class="row">
+                <table class="table" border="0">
+                    <tr>
+                        <th class="text-center">
+                            STRENGTH
+                        </th>
+                        <th>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </th>
+                        <th class="text-center">
+                            DEXTERITY
+                        </th>
+                        <TH>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </TH>
+                        <th class="text-center">
+                            CONSTITUTION
+                        </th>
+                        <th>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </th>
+                        <th class="text-center">
+                            INTELLIGENCE
+                        </th>
+                        <th>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </th>
+                        <th class="text-center">
+                            WISDOM
+                        </th>
+                        <th>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </th>
+                        <th class="text-center">
+                            CHARISMA
+                        </th>
+                        <th>
+                            <p style="font-size: 10px;" class="text-center unhighlighted">Racial Bonus</p>
+                        </th>
+
+                    </tr>
+                    <tr>
+                        <td class = "text-center">
+                            <textarea  style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT1" readonly></textarea>
+                        </td>
+                        <td><p id="strBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                        <td class = "text-center">
+                            <textarea style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT2" readonly></textarea>
+                        </td>
+                        <td><p id="dexBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                        <td class = "text-center">
+                            <textarea style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT3" readonly></textarea>
+                        </td>
+                        <td><p id="conBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                        <td class = "text-center">
+                            <textarea style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT4" readonly></textarea>
+                        </td>
+                        <td><p id="intBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                        <td class = "text-center">
+                            <textarea style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT5" readonly></textarea>
+                        </td>
+                        <td><p id="wisBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                        <td class = "text-center">
+                            <textarea style="width: 60px; font-size: 18px; text-align-last: center;" id="txtSTAT6" readonly></textarea>
+                        </td>
+                        <td><p id="chaBonus" class="text-center highlighted" style="font-size: 24px;"></p></td>
+                    </tr>
+                    <tr>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-0">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-0">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-1">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-1">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-2">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-2">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-3">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-3">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-4">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-4">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                        <td></td>
+                        <td class="text-center">
+                            <div class="btn-group" role="group" >
+                                <button type="button" class="btn btn-default btn-xs" id="btnLeft-5">
+                                    <span class="glyphicon glyphicon-chevron-left"></span>
+                                </button>
+                                <button type="button" class="btn btn-default btn-xs" id="btnRight-5">
+                                    <span class="glyphicon glyphicon-chevron-right"></span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+        </div>
+    </div>
+
+                <div class="panel panel-primary">
+                    <div class="panel-heading">
+                        <h4>Step 5: Pick a class!</h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div id="ddlGuild">
+                                    {{ CreateCharForm.guild }}{% csrf_token %}
+                                </div>
+                                    </div>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <div class="col-md-12">
+                                        <div class="form-group">
+                                <textarea class="form-control"  id="txtGuildInfo" rows = 10 readonly></textarea>
+
+                                </div>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                            <div class="col-md-4">
+                                {% load staticfiles %}
+                    <img src="{% static "game/placeholder.jpg" %}" id = "classimage" class="center-block img-responsive" alt="My image"/>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+
+        <div class="panel panel-primary">
+            <div class="panel-heading">
+                <h4>Step 6: Background/Alignment</h4>
+            </div>
+            <div class="panel-body">
+                <div class="row">
+                    <div class="col-md-6">
+
+                        {{CreateCharForm.lawfulAlignment }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ CreateCharForm.goodAlignment }}
+                    </div>
+                </div>
+                <div class="row" style="padding-top:25px;">
+                    <div class="col-md-3">
+                        What is your character's background?
+                    </div>
+                    <div class="col-md-6">
+                        {{CreateCharForm.background }}
+                    </div>
+                </div>
+                <div class="row" style="padding-top:15px;">
+                    <div class="col-md-12">
+                        <textarea id="txtBackground" rows="8" class="form-control" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+       <div class="panel panel-primary">
+           <div class="panel-heading">
+               <h4>Step 7: Pick skill proficiencies!</h4>
+           </div>
+           <div class="panel-body">
+               <div class="row">
+                   <div class="col-md-4">
+                    <b><p>
+                        Number of Skills Left to Choose:
+                    </p></b>
+                   </div>
+                   <div class="col-md-4">
+                       <div id="skillPoints"></div>
+                   </div>
+               </div>
+
+                <div class="row">
+                    <table class="table" border= 0>
+                        <tr>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkAcrobatics" name="skill">
+                                  <label class="form-check-label" for="Acrobatics" id="lblAcrobatics">
+                                    Acrobatics
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkAnimalHandling" name="skill">
+                                  <label class="form-check-label" for="Animal Handling" id="lblAnimalHandling">
+                                    Animal Handling
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkArcana" name="skill">
+                                  <label class="form-check-label" for="Arcana" id="lblArcana">
+                                    Arcana
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkAthletics" name="skill">
+                                  <label class="form-check-label" for="Athletics" id="lblAthletics">
+                                    Athletics
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkDeception" name="skill">
+                                  <label class="form-check-label" for="Deception" id="lblDeception">
+                                    Deception
+                                  </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkHistory" name="skill">
+                                  <label class="form-check-label" for="History" id="lblHistory">
+                                    History
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkInsight" name="skill">
+                                  <label class="form-check-label" for="Insight" id="lblInsight">
+                                    Insight
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkIntimidation" name="skill">
+                                  <label class="form-check-label" for="Intimidation" id="lblIntimidation">
+                                    Intimidation
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkInvestigation" name="skill">
+                                  <label class="form-check-label" for="Investigation" id="lblInvestigation">
+                                    Investigation
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkMedicine" name="skill">
+                                  <label class="form-check-label" for="Medicine" id="lblMedicine">
+                                    Medicine
+                                  </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkNature" name="skill">
+                                  <label class="form-check-label" for="Nature" id="lblNature">
+                                    Nature
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkPerception" name="skill">
+                                  <label class="form-check-label" for="Perception" id="lblPerception">
+                                    Perception
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkPerformance" name="skill">
+                                  <label class="form-check-label" for="Performance" id="lblPerformance">
+                                    Performance
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkPersuasion" name="skill">
+                                  <label class="form-check-label" for="Persuasion" id="lblPersuasion">
+                                    Persuasion
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkReligion" name="skill">
+                                  <label class="form-check-label" for="Religion" id="lblReligion">
+                                    Religion
+                                  </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkSleightofHand" name="skill">
+                                  <label class="form-check-label" for="SleightofHand" id="lblSleightofHand">
+                                    Sleight of Hand
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkStealth" name="skill">
+                                  <label class="form-check-label" for="Stealth" id="lblStealth">
+                                    Stealth
+                                  </label>
+                            </td>
+                            <td>
+                                <input class="form-check-input" type="checkbox" value="" id="chkSurvival" name="skill">
+                                  <label class="form-check-label" for="Survival" id="lblSurvival">
+                                    Survival
+                                  </label>
+                            </td>
+                        </tr>
+                    </table>
+
+                </div>
+
+        </div>
+
+        <div class="panel-footer">
+                <div class="row">
+        <div class="col-lg-12 text-center panel-relative">
+            <form action="/create_post/" method="POST" id="post-form">
+           <input type="submit" value="Create Character" class="btn btn-success">
+        </div>
+
+    </div>
+           </div>
+
+                </div>
+
+
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+</div>
+
+
+
+</body>
+
+</html>
